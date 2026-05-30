@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>小小农场</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #2c1810;
+    font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    color: #f5e6d3;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  /* ===== Info Bar ===== */
+  #info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #4a3020, #3a2218);
+    border-bottom: 2px solid #5a3a28;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  #info-bar .stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: clamp(13px, 2.5vw, 16px);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  #info-bar .stat .icon { font-size: 1.2em; }
+  #gold-display { color: #ffd700; }
+  #shop-btn {
+    padding: 6px 14px;
+    border: 1px solid #8b7355;
+    border-radius: 20px;
+    background: #5a3a28;
+    color: #f5e6d3;
+    font-size: clamp(12px, 2.2vw, 14px);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #shop-btn:active { background: #7a5a3a; }
+
+  /* ===== Game Area ===== */
+  #game-area {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #3a2a10 0%, #1a0f08 100%);
+  }
+  canvas {
+    display: block;
+    touch-action: manipulation;
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  /* ===== Toast ===== */
+  #toast {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 8px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  #toast.visible { opacity: 1; }
+
+  /* ===== Seed Selector ===== */
+  #seed-selector {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #3a2218;
+    border-top: 1px solid #5a3a28;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  #seed-selector.show { display: flex; }
+  .seed-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 2px solid #6b5040;
+    border-radius: 20px;
+    background: #4a3020;
+    font-size: clamp(11px, 2vw, 13px);
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: 36px;
+  }
+  .seed-chip.active {
+    border-color: #8bc34a;
+    background: #3a5a28;
+    box-shadow: 0 0 8px rgba(139, 195, 74, 0.4);
+  }
+  .seed-chip .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .seed-chip .count { color: #ccc; font-size: 0.9em; }
+
+  /* ===== Toolbar ===== */
+  #toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    background: linear-gradient(0deg, #4a3020, #3a2218);
+    border-top: 2px solid #5a3a28;
+    flex-shrink: 0;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .tool-btn {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border: 2px solid #6b5040;
+    border-radius: 12px;
+    background: #4a3020;
+    color: #c4a882;
+    font-size: clamp(10px, 1.8vw, 13px);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 44px;
+    min-height: 50px;
+  }
+  .tool-btn .tool-icon { font-size: clamp(18px, 3.5vw, 24px); }
+  .tool-btn:active { transform: scale(0.95); }
+  .tool-btn.active {
+    border-color: #8bc34a;
+    background: #3a5a28;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(139, 195, 74, 0.3);
+  }
+
+  /* ===== Shop Modal ===== */
+  #shop-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  #shop-overlay.open { display: flex; }
+  #shop-modal {
+    background: #4a3020;
+    border: 2px solid #7a5a3a;
+    border-radius: 16px;
+    padding: 20px;
+    width: min(360px, 90vw);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+  #shop-modal h2 {
+    text-align: center;
+    margin-bottom: 16px;
+    font-size: 20px;
+    color: #ffd700;
+  }
+  .shop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #5a3a28;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .shop-row:last-of-type { border-bottom: none; }
+  .shop-row .info { flex: 1; min-width: 80px; }
+  .shop-row .name { font-weight: 600; font-size: 14px; }
+  .shop-row .price { font-size: 12px; color: #ccc; }
+  .shop-row .actions { display: flex; gap: 6px; }
+  .shop-row button {
+    padding: 6px 12px;
+    border: 1px solid #7a5a3a;
+    border-radius: 16px;
+    background: #5a3a28;
+    color: #f5e6d3;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .shop-row button:active { background: #7a5a3a; }
+  #shop-close {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 32px;
+    border: 1px solid #8b7355;
+    border-radius: 20px;
+    background: #6b5040;
+    color: #f5e6d3;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  #shop-close:active { background: #8b6b50; }
+
+  /* ===== Virtual D-Pad ===== */
+  #dpad {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    display: grid;
+    grid-template-columns: 48px 48px 48px;
+    grid-template-rows: 48px 48px 48px;
+    gap: 2px;
+    z-index: 5;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    touch-action: manipulation;
+  }
+  #dpad:active, #dpad.touching { opacity: 0.85; }
+  .dpad-btn {
+    width: 48px; height: 48px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.4);
+    color: rgba(255,255,255,0.7);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dpad-btn:active { background: rgba(255,255,255,0.2); }
+  .dpad-empty { background: transparent; border: none; }
+
+  #action-btn {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    width: 64px; height: 64px;
+    border: 3px solid rgba(255,255,255,0.4);
+    border-radius: 50%;
+    background: rgba(139, 195, 74, 0.35);
+    color: #fff;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.1s, background 0.15s;
+  }
+  #action-btn:active { transform: scale(0.85); background: rgba(139, 195, 74, 0.6); }
+
+  /* Hide d-pad on desktop (show with class if touch device) */
+  @media (hover: hover) and (pointer: fine) {
+    #dpad, #action-btn { display: none; }
+  }
+
+  /* Keyboard hint */
+  #kb-hint {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    pointer-events: none;
+    z-index: 2;
+    text-align: center;
+    white-space: nowrap;
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #kb-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Info Bar -->
+<div id="info-bar">
+  <div class="stat">📅 <span id="day-display">第 1 天</span></div>
+  <div class="stat" id="gold-display">🪙 <span id="gold-amount">100</span> G</div>
+  <button id="shop-btn" onclick="toggleShop()">🏪 商店</button>
+</div>
+
+<!-- Game Area -->
+<div id="game-area">
+  <canvas id="farm-canvas"></canvas>
+  <div id="toast"></div>
+  <div id="kb-hint">↑↓←→ 移动 &nbsp; 空格 使用工具 &nbsp; 1-4 切换工具</div>
+  <!-- Virtual D-Pad -->
+  <div id="dpad">
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" data-dir="up"    ontouchstart="movePlayer('up',event)"    onmousedown="movePlayer('up',event)">▲</button>
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" data-dir="left"  ontouchstart="movePlayer('left',event)"  onmousedown="movePlayer('left',event)">◀</button>
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" data-dir="right" ontouchstart="movePlayer('right',event)" onmousedown="movePlayer('right',event)">▶</button>
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" data-dir="down"  ontouchstart="movePlayer('down',event)"  onmousedown="movePlayer('down',event)">▼</button>
+    <div class="dpad-empty"></div>
+  </div>
+  <button id="action-btn" ontouchstart="useToolAtPlayer(event)" onmousedown="useToolAtPlayer(event)">⚒</button>
+</div>
+
+<!-- Seed Selector -->
+<div id="seed-selector">
+  <div class="seed-chip active" data-seed="turnip" onclick="selectSeed('turnip')">
+    <span class="dot" style="background:#f0f0e0"></span>
+    白萝卜 <span class="count" id="seed-count-turnip">x5</span>
+  </div>
+  <div class="seed-chip" data-seed="potato" onclick="selectSeed('potato')">
+    <span class="dot" style="background:#c4a35a"></span>
+    土豆 <span class="count" id="seed-count-potato">x3</span>
+  </div>
+  <div class="seed-chip" data-seed="tomato" onclick="selectSeed('tomato')">
+    <span class="dot" style="background:#e74c3c"></span>
+    番茄 <span class="count" id="seed-count-tomato">x1</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button class="tool-btn active" data-tool="hoe" onclick="selectTool('hoe')">
+    <span class="tool-icon">🔨</span> 锄头
+  </button>
+  <button class="tool-btn" data-tool="water" onclick="selectTool('water')">
+    <span class="tool-icon">💧</span> 水壶
+  </button>
+  <button class="tool-btn" data-tool="seed" onclick="selectTool('seed')">
+    <span class="tool-icon">🌱</span> 种子
+  </button>
+  <button class="tool-btn" data-tool="hand" onclick="selectTool('hand')">
+    <span class="tool-icon">🧺</span> 收获
+  </button>
+</div>
+
+<!-- Shop Modal -->
+<div id="shop-overlay" onclick="closeShop(event)">
+  <div id="shop-modal" onclick="event.stopPropagation()">
+    <h2>🏪 种子商店</h2>
+    <div class="shop-row">
+      <div class="info"><div class="name">白萝卜种子</div><div class="price">10 G / 个</div></div>
+      <div class="actions">
+        <button onclick="buySeeds('turnip',1)">买 1 个</button>
+        <button onclick="buySeeds('turnip',5)">买 5 个</button>
+      </div>
+    </div>
+    <div class="shop-row">
+      <div class="info"><div class="name">土豆种子</div><div class="price">25 G / 个</div></div>
+      <div class="actions">
+        <button onclick="buySeeds('potato',1)">买 1 个</button>
+        <button onclick="buySeeds('potato',5)">买 5 个</button>
+      </div>
+    </div>
+    <div class="shop-row">
+      <div class="info"><div class="name">番茄种子</div><div class="price">50 G / 个</div></div>
+      <div class="actions">
+        <button onclick="buySeeds('tomato',1)">买 1 个</button>
+        <button onclick="buySeeds('tomato',5)">买 5 个</button>
+      </div>
+    </div>
+    <button id="shop-close" onclick="toggleShop()">关闭</button>
+  </div>
+</div>
+
+<script>
+// ==================== CONSTANTS ====================
+const COLS = 8;
+const ROWS = 6;
+const TILE_GAP = 2;
+const MAX_TILE_SIZE = 64;
+const MIN_TILE_SIZE = 36;
+
+const CROP_DEFS = {
+  turnip:  { name: '白萝卜', seedPrice: 10,  sellPrice: 20,  growthTime: 30000,  stages: 3, color: '#f0f0e0', leafColor: '#6ab04c' },
+  potato:  { name: '土豆',   seedPrice: 25,  sellPrice: 50,  growthTime: 60000,  stages: 4, color: '#c4a35a', leafColor: '#4a8c2a' },
+  tomato:  { name: '番茄',   seedPrice: 50,  sellPrice: 100, growthTime: 120000, stages: 5, color: '#e74c3c', leafColor: '#2d7a2d' },
+};
+
+const TOOLS = [
+  { id: 'hoe',   icon: '🔨', name: '锄头' },
+  { id: 'water', icon: '💧', name: '水壶' },
+  { id: 'seed',  icon: '🌱', name: '种子' },
+  { id: 'hand',  icon: '🧺', name: '收获' },
+];
+
+// ==================== GAME STATE ====================
+const state = {
+  gold: 100,
+  day: 1,
+  selectedTool: 'hoe',
+  selectedSeed: 'turnip',
+  inventory: { turnipSeeds: 5, potatoSeeds: 3, tomatoSeeds: 1 },
+  tiles: [],
+  toast: null,
+  dayAccum: 0,
+  DAY_DURATION: 120000,
+  player: {
+    row: 3, col: 4,
+    facing: 'down',
+    walking: false,
+    walkAndAct: false,
+    walkStart: 0,
+    walkFrom: null,
+    walkTo: null,
+    walkQueue: [],          // remaining steps [{row, col}, ...]
+  },
+};
+
+// Initialize tiles
+for (let row = 0; row < ROWS; row++) {
+  for (let col = 0; col < COLS; col++) {
+    state.tiles.push({
+      row, col,
+      type: 'grass',   // 'grass' | 'tilled' | 'planted' | 'ready'
+      watered: false,
+      crop: null,      // { type, plantedAt }
+    });
+  }
+}
+
+function getTile(row, col) {
+  return state.tiles[row * COLS + col];
+}
+
+function getCropProgress(tile) {
+  if (!tile.crop) return { progress: 0, stage: 0, ready: false };
+  const def = CROP_DEFS[tile.crop.type];
+  const elapsed = Date.now() - tile.crop.plantedAt;
+  const progress = Math.min(1, elapsed / def.growthTime);
+  const stage = Math.min(def.stages - 1, Math.floor(progress * def.stages));
+  return { progress, stage, ready: progress >= 1 };
+}
+
+// ==================== DOM REFS ====================
+const canvas = document.getElementById('farm-canvas');
+const ctx = canvas.getContext('2d');
+const toastEl = document.getElementById('toast');
+const seedSelector = document.getElementById('seed-selector');
+const shopOverlay = document.getElementById('shop-overlay');
+const goldAmountEl = document.getElementById('gold-amount');
+const dayDisplayEl = document.getElementById('day-display');
+
+let tileSize = MAX_TILE_SIZE;
+let canvasW = 0;
+let canvasH = 0;
+let hoveredTile = null;
+let lastTouchTile = null;
+let dpr = 1;
+
+// ==================== CANVAS SIZING ====================
+function resizeCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  const infoBar = document.getElementById('info-bar');
+  const toolbar = document.getElementById('toolbar');
+  const seedSel = document.getElementById('seed-selector');
+  const infoH = infoBar.offsetHeight;
+  const toolH = toolbar.offsetHeight;
+  const seedH = seedSel.classList.contains('show') ? seedSel.offsetHeight : 0;
+  const availW = window.innerWidth;
+  const availH = window.innerHeight - infoH - toolH - seedH;
+
+  let tsW = Math.floor((availW - TILE_GAP * (COLS - 1)) / COLS);
+  let tsH = Math.floor((availH - TILE_GAP * (ROWS - 1)) / ROWS);
+  let ts = Math.min(tsW, tsH);
+  ts = Math.max(MIN_TILE_SIZE, Math.min(MAX_TILE_SIZE, ts));
+  tileSize = ts;
+
+  canvasW = tileSize * COLS + TILE_GAP * (COLS - 1);
+  canvasH = tileSize * ROWS + TILE_GAP * (ROWS - 1);
+
+  canvas.style.width = canvasW + 'px';
+  canvas.style.height = canvasH + 'px';
+  canvas.width = canvasW * dpr;
+  canvas.height = canvasH * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+}
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
+
+// ==================== COORDINATE MAPPING ====================
+function pixelToTile(canvasX, canvasY) {
+  const col = Math.floor(canvasX / (tileSize + TILE_GAP));
+  const row = Math.floor(canvasY / (tileSize + TILE_GAP));
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+  return { row, col };
+}
+
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top,
+  };
+}
+
+// ==================== RENDERING ====================
+function drawTileBg(tile, x, y, s) {
+  let color;
+  switch (tile.type) {
+    case 'grass':   color = '#7ec850'; break;
+    case 'tilled':  color = tile.watered ? '#8b6914' : '#b8956a'; break;
+    case 'planted': color = tile.watered ? '#9b7930' : '#c4a56a'; break;
+    case 'ready':   color = '#cda853'; break;
+  }
+
+  // Round rect tile
+  const r = Math.max(2, s * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + s - r, y);
+  ctx.quadraticCurveTo(x + s, y, x + s, y + r);
+  ctx.lineTo(x + s, y + s - r);
+  ctx.quadraticCurveTo(x + s, y + s, x + s - r, y + s);
+  ctx.lineTo(x + r, y + s);
+  ctx.quadraticCurveTo(x, y + s, x, y + s - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // Water effect
+  if (tile.watered && tile.type !== 'grass') {
+    const now = Date.now() / 600;
+    ctx.fillStyle = 'rgba(100,180,255,0.15)';
+    for (let i = 0; i < 3; i++) {
+      const wx = x + s * 0.2 + (i * s * 0.25);
+      const wy = y + s * 0.3 + Math.sin(now + i) * s * 0.1;
+      ctx.beginPath();
+      ctx.arc(wx, wy, s * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // diagonal shimmer lines
+    ctx.strokeStyle = 'rgba(150,210,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([s * 0.15, s * 0.4]);
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.1, y + s * 0.05);
+    ctx.lineTo(x + s * 0.9, y + s * 0.95);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawCrop(tile, x, y, s) {
+  if (!tile.crop) return;
+  const def = CROP_DEFS[tile.crop.type];
+  const prog = getCropProgress(tile);
+  const cx = x + s / 2;
+  const cy = y + s / 2;
+  const scale = 0.3 + prog.progress * 0.7;
+  const ready = prog.ready;
+
+  // Pulse when ready
+  let pulse = 1;
+  if (ready) {
+    pulse = 1 + Math.sin(Date.now() / 400) * 0.08;
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale * pulse, scale * pulse);
+
+  const plantSize = s * 0.3;
+
+  drawCropShape(def, tile.crop.type, prog, plantSize);
+  ctx.restore();
+}
+
+function drawCropShape(def, type, prog, size) {
+  // Draw based on stage
+  if (prog.stage === 0) {
+    // Just planted: small green dot
+    ctx.fillStyle = def.leafColor;
+    ctx.beginPath();
+    ctx.arc(0, size * 0.2, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (prog.stage === 1) {
+    // Two leaves
+    ctx.fillStyle = def.leafColor;
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.3, size * 0.1, size * 0.35, size * 0.15, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(size * 0.3, size * 0.1, size * 0.35, size * 0.15, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // tiny stem
+    ctx.strokeStyle = def.leafColor;
+    ctx.lineWidth = Math.max(1, size * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.3);
+    ctx.lineTo(0, -size * 0.1);
+    ctx.stroke();
+  } else if (prog.stage >= 2 && !prog.ready) {
+    // Growing plant: stem + multiple leaves
+    ctx.strokeStyle = '#5a8a2a';
+    ctx.lineWidth = Math.max(1, size * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.35);
+    ctx.lineTo(0, -size * 0.15);
+    ctx.stroke();
+    // leaves
+    ctx.fillStyle = def.leafColor;
+    const leafCount = 2 + prog.stage;
+    for (let i = 0; i < leafCount; i++) {
+      const angle = (i / leafCount) * Math.PI * 2 - Math.PI / 2;
+      const lx = Math.cos(angle) * size * 0.3;
+      const ly = Math.sin(angle) * size * 0.25 - size * 0.05;
+      ctx.beginPath();
+      ctx.ellipse(lx, ly, size * 0.3, size * 0.12, angle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // Ready to harvest: full crop visual
+    drawMatureCrop(type, size);
+  }
+}
+
+function drawMatureCrop(type, size) {
+  const def = CROP_DEFS[type];
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(0, size * 0.35, size * 0.5, size * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (type === 'turnip') {
+    // White oval body
+    ctx.fillStyle = '#f5f5f0';
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.05, size * 0.35, size * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d5d5cc';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Green leaves on top
+    ctx.fillStyle = def.leafColor;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.ellipse(i * size * 0.2, -size * 0.35, size * 0.12, size * 0.25, i * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Purple top tint
+    ctx.fillStyle = 'rgba(180,140,200,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.2, size * 0.25, size * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (type === 'potato') {
+    // Brown lumpy body
+    ctx.fillStyle = def.color;
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.05, size * 0.38, size * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Lumps
+    ctx.fillStyle = '#b8924a';
+    ctx.beginPath(); ctx.arc(-size * 0.2, -size * 0.05, size * 0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(size * 0.25, size * 0.1, size * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-size * 0.1, size * 0.2, size * 0.1, 0, Math.PI * 2); ctx.fill();
+    // Eyes (dots)
+    ctx.fillStyle = '#6b4e2a';
+    const eyes = [[-0.15, -0.15], [0.1, -0.1], [0.2, 0.05], [-0.2, 0.12]];
+    eyes.forEach(([ex, ey]) => {
+      ctx.beginPath();
+      ctx.arc(ex * size, ey * size, size * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    // Tiny sprout
+    ctx.strokeStyle = '#4a8c2a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.25);
+    ctx.lineTo(0, -size * 0.4);
+    ctx.stroke();
+    ctx.fillStyle = '#4a8c2a';
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.4, size * 0.1, size * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (type === 'tomato') {
+    // Red round body
+    ctx.fillStyle = def.color;
+    ctx.beginPath();
+    ctx.arc(0, size * 0.05, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.arc(-size * 0.1, -size * 0.15, size * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    // Green calyx (star shape)
+    ctx.fillStyle = def.leafColor;
+    const petalCount = 5;
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i / petalCount) * Math.PI * 2 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.ellipse(
+        Math.cos(angle) * size * 0.15,
+        -size * 0.3 + Math.sin(angle) * size * 0.08,
+        size * 0.1, size * 0.16, angle, 0, Math.PI * 2
+      );
+      ctx.fill();
+    }
+    // Center dot
+    ctx.fillStyle = '#3a6a1a';
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.28, size * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPlayer() {
+  const p = state.player;
+  // Calculate visual position (with walk animation lerp)
+  let px, py;
+  const WALK_DURATION = 200; // ms per step
+
+  if (p.walking) {
+    const elapsed = Date.now() - p.walkStart;
+    const t = Math.min(1, elapsed / WALK_DURATION);
+    // Ease out quad
+    const ease = 1 - (1 - t) * (1 - t);
+    const fx = p.walkFrom.col * (tileSize + TILE_GAP) + tileSize / 2;
+    const fy = p.walkFrom.row * (tileSize + TILE_GAP) + tileSize / 2;
+    const tx = p.walkTo.col * (tileSize + TILE_GAP) + tileSize / 2;
+    const ty = p.walkTo.row * (tileSize + TILE_GAP) + tileSize / 2;
+    px = fx + (tx - fx) * ease;
+    py = fy + (ty - fy) * ease;
+
+    if (t >= 1) {
+      // Arrived at this step's destination
+      p.row = p.walkTo.row;
+      p.col = p.walkTo.col;
+
+      if (p.walkQueue.length > 0) {
+        // More steps: start next one
+        // Set facing based on next step direction
+        const next = p.walkQueue.shift();
+        if (next.col < p.col) p.facing = 'left';
+        else if (next.col > p.col) p.facing = 'right';
+        else if (next.row < p.row) p.facing = 'up';
+        else p.facing = 'down';
+
+        p.walkFrom = { row: p.row, col: p.col };
+        p.walkTo = next;
+        p.walkStart = Date.now();
+      } else {
+        // Queue complete
+        p.walking = false;
+        if (p.walkAndAct) {
+          onTileInteract(p.row, p.col);
+        }
+      }
+    }
+  } else {
+    px = p.col * (tileSize + TILE_GAP) + tileSize / 2;
+    py = p.row * (tileSize + TILE_GAP) + tileSize / 2;
+  }
+
+  const s = tileSize * 0.55; // character base size
+
+  // Walk animation — frame-based leg cycle (like Stardew Valley sprite swapping)
+  const WALK_FRAME_MS = 150;
+  let walkFrame = 0, legOffL = 0, legOffR = 0, legOffH = 0, bobY = 0;
+
+  if (p.walking) {
+    walkFrame = Math.floor(Date.now() / WALK_FRAME_MS) % 2;
+    const legStep = s * 0.09;
+    if (walkFrame === 0) {
+      legOffL = legStep; legOffR = -legStep; legOffH = -legStep;
+    } else {
+      legOffL = -legStep; legOffR = legStep; legOffH = legStep;
+    }
+    bobY = -Math.abs(Math.sin(Math.PI * (Date.now() - p.walkStart) / WALK_DURATION)) * s * 0.05;
+  }
+
+  ctx.save();
+  ctx.translate(px, py - s * 0.15 + bobY);
+
+  const dir = p.facing;
+
+  // === Shadow ===
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(0, s * 0.4, s * 0.35, s * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === Body ===
+  const bodyColor = '#5b8c5a'; // green overalls
+  const shirtColor = '#e8c97a';
+  const skinColor = '#f4c9a0';
+  const hatColor = '#d4a854';
+  const hatBandColor = '#8b5e3c';
+  const bootColor = '#5a3a28';
+
+  if (dir === 'down') {
+    // --- FACING DOWN (front view) ---
+    // Boots (with walk frame offset)
+    ctx.fillStyle = bootColor;
+    ctx.fillRect(-s * 0.2, s * 0.28 + legOffL, s * 0.15, s * 0.15);
+    ctx.fillRect(s * 0.05, s * 0.28 + legOffR, s * 0.15, s * 0.15);
+    // Legs
+    ctx.fillStyle = '#4a6b3a';
+    ctx.fillRect(-s * 0.15, s * 0.1 + legOffL, s * 0.12, s * 0.2);
+    ctx.fillRect(s * 0.03, s * 0.1 + legOffR, s * 0.12, s * 0.2);
+    // Body/overalls
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.3, -s * 0.05, s * 0.6, s * 0.25, s * 0.06);
+    ctx.fill();
+    // Overall straps
+    ctx.strokeStyle = '#3a5a2a';
+    ctx.lineWidth = Math.max(1, s * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.12, s * 0.05);
+    ctx.lineTo(-s * 0.12, -s * 0.05);
+    ctx.moveTo(s * 0.12, s * 0.05);
+    ctx.lineTo(s * 0.12, -s * 0.05);
+    ctx.stroke();
+    // Shirt peeking out
+    ctx.fillStyle = shirtColor;
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.02, s * 0.15, Math.PI, 0);
+    ctx.fill();
+    // Head
+    ctx.fillStyle = skinColor;
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.15, s * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(-s * 0.07, -s * 0.18, s * 0.03, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.18, s * 0.03, 0, Math.PI * 2); ctx.fill();
+    // Smile
+    ctx.strokeStyle = '#a06b4a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.13, s * 0.06, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+    // Hat brim
+    ctx.fillStyle = hatColor;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.28, s * 0.28, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Hat top
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.32, s * 0.2, s * 0.1, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    // Hat band
+    ctx.strokeStyle = hatBandColor;
+    ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.3, s * 0.2, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+  } else if (dir === 'up') {
+    // --- FACING UP (back view) ---
+    // Boots
+    ctx.fillStyle = bootColor;
+    ctx.fillRect(-s * 0.2, s * 0.28 + legOffL, s * 0.15, s * 0.15);
+    ctx.fillRect(s * 0.05, s * 0.28 + legOffR, s * 0.15, s * 0.15);
+    // Legs
+    ctx.fillStyle = '#4a6b3a';
+    ctx.fillRect(-s * 0.15, s * 0.1 + legOffL, s * 0.12, s * 0.2);
+    ctx.fillRect(s * 0.03, s * 0.1 + legOffR, s * 0.12, s * 0.2);
+    // Body (back)
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.3, -s * 0.05, s * 0.6, s * 0.25, s * 0.06);
+    ctx.fill();
+    // Crossed straps on back
+    ctx.strokeStyle = '#3a5a2a';
+    ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.15, -s * 0.05); ctx.lineTo(s * 0.15, s * 0.2);
+    ctx.moveTo(s * 0.15, -s * 0.05); ctx.lineTo(-s * 0.15, s * 0.2);
+    ctx.stroke();
+    // Head (back)
+    ctx.fillStyle = skinColor;
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.15, s * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Hair
+    ctx.fillStyle = '#5a3a20';
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.15, s * 0.2, Math.PI, Math.PI * 2);
+    ctx.fill();
+    // Hat (same as front but covers more)
+    ctx.fillStyle = hatColor;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.28, s * 0.28, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.32, s * 0.2, s * 0.1, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hatBandColor;
+    ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.3, s * 0.2, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+  } else if (dir === 'left' || dir === 'right') {
+    const flip = dir === 'right' ? 1 : -1;
+
+    // Boots (with walk frame horizontal offset)
+    ctx.fillStyle = bootColor;
+    ctx.fillRect(-s * 0.25 + legOffH, s * 0.28, s * 0.15, s * 0.12);
+    ctx.fillRect(s * 0.05 - legOffH, s * 0.28, s * 0.15, s * 0.12);
+    // Legs
+    ctx.fillStyle = '#4a6b3a';
+    ctx.fillRect(-s * 0.2 + legOffH, s * 0.1, s * 0.1, s * 0.2);
+    ctx.fillRect(s * 0.08 - legOffH, s * 0.1, s * 0.1, s * 0.2);
+    // Body (side)
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.25, -s * 0.05, s * 0.5, s * 0.25, s * 0.06);
+    ctx.fill();
+    // Arm
+    ctx.fillStyle = shirtColor;
+    ctx.fillRect(-s * 0.15, -s * 0.02, s * 0.12, s * 0.06);
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-s * 0.2, 0, s * 0.08, s * 0.06);
+    // Head
+    ctx.fillStyle = skinColor;
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.15, s * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye (profile)
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(flip * s * 0.08, -s * 0.18, s * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose
+    ctx.fillStyle = '#e0b080';
+    ctx.beginPath();
+    ctx.arc(flip * s * 0.18, -s * 0.14, s * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+    // Hat
+    ctx.fillStyle = hatColor;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.28, s * 0.28, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.32, s * 0.2, s * 0.1, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hatBandColor;
+    ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.3, s * 0.2, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // === Tool indicator (small icon above character) ===
+  const toolIcons = { hoe: '🔨', water: '💧', seed: '🌱', hand: '🧺' };
+  const toolIcon = toolIcons[state.selectedTool] || '';
+  ctx.font = `${s * 0.35}px sans-serif`;
+  ctx.textAlign = 'center';
+  const toolFloat = p.walking ? 0 : Math.sin(Date.now() / 600) * 2;
+  ctx.fillText(toolIcon, 0, -s * 0.48 + toolFloat);
+
+  ctx.restore();
+
+  // === Dust particles (world space, at character's feet) ===
+  if (p.walking) {
+    const elapsed = Date.now() - p.walkStart;
+    const t = elapsed / WALK_DURATION;
+    if (p.walkFrom) {
+      const dfx = p.walkFrom.col * (tileSize + TILE_GAP) + tileSize / 2;
+      const dfy = p.walkFrom.row * (tileSize + TILE_GAP) + tileSize / 2 + s * 0.3;
+      const fade = Math.max(0, 1 - t * 1.5);
+      if (fade > 0) {
+        const offsets = [[-1,-1], [1,0], [0,-1.5]];
+        for (let i = 0; i < 3; i++) {
+          const dist = (1 - fade) * s * 0.45;
+          ctx.fillStyle = `rgba(180,150,120,${fade * 0.35})`;
+          ctx.beginPath();
+          ctx.arc(dfx + offsets[i][0] * dist, dfy + offsets[i][1] * dist, s * 0.05 * fade, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // Background (dirt between tiles)
+  ctx.fillStyle = '#5a3a20';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  // Draw tiles
+  for (const tile of state.tiles) {
+    const x = tile.col * (tileSize + TILE_GAP);
+    const y = tile.row * (tileSize + TILE_GAP);
+
+    drawTileBg(tile, x, y, tileSize);
+    drawCrop(tile, x, y, tileSize);
+  }
+
+  // Hover highlight (only show when not walking)
+  const highlight = state.player.walking ? null : (hoveredTile || lastTouchTile);
+  if (highlight) {
+    const hx = highlight.col * (tileSize + TILE_GAP);
+    const hy = highlight.row * (tileSize + TILE_GAP);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    const r = Math.max(2, tileSize * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(hx + r, hy);
+    ctx.lineTo(hx + tileSize - r, hy);
+    ctx.quadraticCurveTo(hx + tileSize, hy, hx + tileSize, hy + r);
+    ctx.lineTo(hx + tileSize, hy + tileSize - r);
+    ctx.quadraticCurveTo(hx + tileSize, hy + tileSize, hx + tileSize - r, hy + tileSize);
+    ctx.lineTo(hx + r, hy + tileSize);
+    ctx.quadraticCurveTo(hx, hy + tileSize, hx, hy + tileSize - r);
+    ctx.lineTo(hx, hy + r);
+    ctx.quadraticCurveTo(hx, hy, hx + r, hy);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Draw 3×3 action range indicator around player
+  if (!state.player.walking) {
+    const p = state.player;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const tr = p.row + dr;
+        const tc = p.col + dc;
+        if (tr < 0 || tr >= ROWS || tc < 0 || tc >= COLS) continue;
+        if (dr === 0 && dc === 0) continue; // player tile gets its own highlight
+        const rx = tc * (tileSize + TILE_GAP);
+        const ry = tr * (tileSize + TILE_GAP);
+        ctx.fillStyle = 'rgba(255,255,200,0.08)';
+        const rr = Math.max(2, tileSize * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(rx + rr, ry);
+        ctx.lineTo(rx + tileSize - rr, ry);
+        ctx.quadraticCurveTo(rx + tileSize, ry, rx + tileSize, ry + rr);
+        ctx.lineTo(rx + tileSize, ry + tileSize - rr);
+        ctx.quadraticCurveTo(rx + tileSize, ry + tileSize, rx + tileSize - rr, ry + tileSize);
+        ctx.lineTo(rx + rr, ry + tileSize);
+        ctx.quadraticCurveTo(rx, ry + tileSize, rx, ry + tileSize - rr);
+        ctx.lineTo(rx, ry + rr);
+        ctx.quadraticCurveTo(rx, ry, rx + rr, ry);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // Draw player with highlight on their tile
+  if (!state.player.walking) {
+    const hx = state.player.col * (tileSize + TILE_GAP);
+    const hy = state.player.row * (tileSize + TILE_GAP);
+    ctx.strokeStyle = 'rgba(255,255,200,0.6)';
+    ctx.lineWidth = 2;
+    const r = Math.max(2, tileSize * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(hx + r, hy);
+    ctx.lineTo(hx + tileSize - r, hy);
+    ctx.quadraticCurveTo(hx + tileSize, hy, hx + tileSize, hy + r);
+    ctx.lineTo(hx + tileSize, hy + tileSize - r);
+    ctx.quadraticCurveTo(hx + tileSize, hy + tileSize, hx + tileSize - r, hy + tileSize);
+    ctx.lineTo(hx + r, hy + tileSize);
+    ctx.quadraticCurveTo(hx, hy + tileSize, hx, hy + tileSize - r);
+    ctx.lineTo(hx, hy + r);
+    ctx.quadraticCurveTo(hx, hy, hx + r, hy);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  drawPlayer();
+}
+
+// ==================== GAME LOOP ====================
+let lastTime = 0;
+let lastGrowthCheck = 0;
+
+function update(timestamp) {
+  // Day counter
+  if (lastTime) {
+    state.dayAccum += timestamp - lastTime;
+    while (state.dayAccum >= state.DAY_DURATION) {
+      state.dayAccum -= state.DAY_DURATION;
+      state.day++;
+    }
+  }
+  lastTime = timestamp;
+
+  // Check crop readiness (every 500ms is enough)
+  if (timestamp - lastGrowthCheck > 500) {
+    lastGrowthCheck = timestamp;
+    for (const tile of state.tiles) {
+      if (tile.type === 'planted' && tile.crop) {
+        const elapsed = Date.now() - tile.crop.plantedAt;
+        if (elapsed >= CROP_DEFS[tile.crop.type].growthTime) {
+          tile.type = 'ready';
+        }
+      }
+    }
+  }
+
+  // Toast expiry
+  if (state.toast && Date.now() > state.toast.expiresAt) {
+    state.toast = null;
+    toastEl.classList.remove('visible');
+  }
+
+  // UI sync
+  goldAmountEl.textContent = state.gold;
+  dayDisplayEl.textContent = '第 ' + state.day + ' 天';
+}
+
+function gameLoop(timestamp) {
+  update(timestamp);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// ==================== TOAST ====================
+function showToast(message) {
+  state.toast = { message, expiresAt: Date.now() + 1600 };
+  toastEl.textContent = message;
+  toastEl.classList.add('visible');
+}
+
+// ==================== TOOL / SEED SELECTION ====================
+function selectTool(toolId) {
+  state.selectedTool = toolId;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-tool="${toolId}"]`).classList.add('active');
+
+  if (toolId === 'seed') {
+    seedSelector.classList.add('show');
+  } else {
+    seedSelector.classList.remove('show');
+  }
+  resizeCanvas();
+}
+
+function selectSeed(seedType) {
+  state.selectedSeed = seedType;
+  document.querySelectorAll('.seed-chip').forEach(c => c.classList.remove('active'));
+  document.querySelector(`[data-seed="${seedType}"]`).classList.add('active');
+}
+
+function updateSeedCounts() {
+  document.getElementById('seed-count-turnip').textContent = 'x' + state.inventory.turnipSeeds;
+  document.getElementById('seed-count-potato').textContent = 'x' + state.inventory.potatoSeeds;
+  document.getElementById('seed-count-tomato').textContent = 'x' + state.inventory.tomatoSeeds;
+}
+
+// ==================== PLAYER MOVEMENT ====================
+function movePlayer(dir, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  const p = state.player;
+  if (p.walking) return;
+
+  p.facing = dir;
+  let nr = p.row, nc = p.col;
+  switch (dir) {
+    case 'up':    nr = p.row - 1; break;
+    case 'down':  nr = p.row + 1; break;
+    case 'left':  nc = p.col - 1; break;
+    case 'right': nc = p.col + 1; break;
+  }
+
+  if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return;
+
+  p.walkFrom = { row: p.row, col: p.col };
+  p.walkTo = { row: nr, col: nc };
+  p.walkAndAct = false;  // movement only, no tool use
+  p.walking = true;
+  p.walkStart = Date.now();
+}
+
+function useToolAtPlayer(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  const p = state.player;
+  if (p.walking) return;
+  onTileInteract(p.row, p.col);
+}
+
+// ==================== TILE ACTIONS ====================
+function onTileInteract(row, col) {
+  const tile = getTile(row, col);
+  if (!tile) return;
+
+  switch (state.selectedTool) {
+    case 'hoe':   actionHoe(tile); break;
+    case 'water': actionWater(tile); break;
+    case 'seed':  actionPlant(tile); break;
+    case 'hand':  actionHarvest(tile); break;
+  }
+  updateSeedCounts();
+}
+
+function actionHoe(tile) {
+  if (tile.type !== 'grass') {
+    showToast('这里不需要锄地。');
+    return;
+  }
+  tile.type = 'tilled';
+  tile.watered = false;
+  tile.crop = null;
+  showToast('已锄地 ✓');
+}
+
+function actionWater(tile) {
+  if (tile.type === 'grass') {
+    showToast('请先锄地。');
+    return;
+  }
+  if (tile.watered) {
+    showToast('已经浇过水了。');
+    return;
+  }
+  tile.watered = true;
+  showToast('已浇水 ✓');
+}
+
+function actionPlant(tile) {
+  if (tile.type !== 'tilled') {
+    showToast('请先锄地。');
+    return;
+  }
+  const seedKey = state.selectedSeed + 'Seeds';
+  if (state.inventory[seedKey] <= 0) {
+    showToast('种子不足！请购买更多。');
+    return;
+  }
+  state.inventory[seedKey]--;
+  tile.crop = { type: state.selectedSeed, plantedAt: Date.now() };
+  tile.type = 'planted';
+  tile.watered = false;
+  showToast('已种植 ' + CROP_DEFS[state.selectedSeed].name + ' ✓');
+}
+
+function actionHarvest(tile) {
+  if (tile.type !== 'ready') {
+    showToast('还没有成熟，请耐心等待。');
+    return;
+  }
+  const def = CROP_DEFS[tile.crop.type];
+  state.gold += def.sellPrice;
+  tile.type = 'grass';
+  tile.watered = false;
+  tile.crop = null;
+  showToast('+' + def.sellPrice + ' 金币！🧺');
+}
+
+// ==================== SHOP ====================
+function toggleShop() {
+  shopOverlay.classList.toggle('open');
+}
+
+function closeShop(e) {
+  if (e.target === shopOverlay) {
+    shopOverlay.classList.remove('open');
+  }
+}
+
+function buySeeds(type, quantity) {
+  const def = CROP_DEFS[type];
+  const cost = def.seedPrice * quantity;
+  if (state.gold < cost) {
+    showToast('金币不足！需要 ' + cost + ' G');
+    return;
+  }
+  state.gold -= cost;
+  const key = type + 'Seeds';
+  state.inventory[key] += quantity;
+  updateSeedCounts();
+  showToast('购买了 ' + quantity + ' 个' + def.name + '种子 ✓');
+}
+
+// ==================== INPUT HANDLING ====================
+function handleTileClick(row, col) {
+  const p = state.player;
+  if (p.walking) return;
+
+  const dr = row - p.row;
+  const dc = col - p.col;
+  const dist = Math.max(Math.abs(dr), Math.abs(dc)); // Chebyshev distance
+
+  if (dist <= 1) {
+    // === In 3×3 range: use tool ===
+    if (dc < 0) p.facing = 'left';
+    else if (dc > 0) p.facing = 'right';
+    else if (dr < 0) p.facing = 'up';
+    else if (dr > 0) p.facing = 'down';
+
+    onTileInteract(row, col);
+  } else {
+    // === Out of range: build step-by-step path ===
+    p.walkQueue = [];
+    // Walk horizontally first, then vertically
+    let cr = p.row, cc = p.col;
+    while (cc !== col) {
+      cc += Math.sign(col - cc);
+      p.walkQueue.push({ row: cr, col: cc });
+    }
+    while (cr !== row) {
+      cr += Math.sign(row - cr);
+      p.walkQueue.push({ row: cr, col: cc });
+    }
+
+    // Start first step
+    const next = p.walkQueue.shift();
+    if (next.col < p.col) p.facing = 'left';
+    else if (next.col > p.col) p.facing = 'right';
+    else if (next.row < p.row) p.facing = 'up';
+    else p.facing = 'down';
+
+    p.walkFrom = { row: p.row, col: p.col };
+    p.walkTo = next;
+    p.walkAndAct = false;
+    p.walking = true;
+    p.walkStart = Date.now();
+  }
+}
+
+canvas.addEventListener('click', (e) => {
+  const pos = getCanvasPos(e);
+  const tile = pixelToTile(pos.x, pos.y);
+  if (tile) handleTileClick(tile.row, tile.col);
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const ty = e.touches[0].clientY - rect.top;
+  if (ty > rect.height * 0.65) return; // d-pad area
+
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+  const tile = pixelToTile(pos.x, pos.y);
+  if (tile) handleTileClick(tile.row, tile.col);
+}, { passive: false });
+
+canvas.addEventListener('mousemove', (e) => {
+  const pos = getCanvasPos(e);
+  hoveredTile = pixelToTile(pos.x, pos.y);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredTile = null;
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  // Don't handle if shop is open
+  if (shopOverlay.classList.contains('open')) return;
+
+  switch (e.key.toLowerCase()) {
+    case '1': selectTool('hoe'); break;
+    case '2': selectTool('water'); break;
+    case '3': selectTool('seed'); break;
+    case '4': selectTool('hand'); break;
+    case 'q': toggleShop(); break;
+    // Movement
+    case 'arrowup': case 'w': movePlayer('up'); e.preventDefault(); break;
+    case 'arrowdown': case 's': movePlayer('down'); e.preventDefault(); break;
+    case 'arrowleft': case 'a': movePlayer('left'); e.preventDefault(); break;
+    case 'arrowright': case 'd': movePlayer('right'); e.preventDefault(); break;
+    // Action
+    case ' ': case 'e': useToolAtPlayer(); e.preventDefault(); break;
+  }
+});
+
+// ==================== INIT ====================
+resizeCanvas();
+updateSeedCounts();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
