@@ -1,8 +1,7 @@
 [build]
-  command = "npx next build"
-  publish = ".next"
-  functions = ".netlify/functions"
+  command = ""
+  publish = "."
 
-[build.environment]
-  NODE_VERSION = "20"
-  NEXT_TELEMETRY_DISABLED = "1"
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
