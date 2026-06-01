@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pet": "start msedge --app=http://localhost:3000/claude-pet.html --window-size=200,240",
+    "pet:ps": "powershell -ExecutionPolicy Bypass -File desktop-pet/launch.ps1"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -14,6 +16,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.11",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
